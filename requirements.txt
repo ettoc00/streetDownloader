@@ -1,0 +1,10 @@
+attrs
+cattrs
+opencv-python
+numpy
+aiohttp
+python-dotenv
+tqdm
+geopy
+selenium
+chromedriver-autoinstaller
