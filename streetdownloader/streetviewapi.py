@@ -14,6 +14,7 @@ MAX_API_REQ_PER_MIN = 32000
 
 load_dotenv()
 GOOGLE_API_KEY = getenv("GOOGLE_API_KEY")
+GOOGLE_API_SIGNATURE = getenv("GOOGLE_API_SIGNATURE")
 
 
 @attrs.define
@@ -51,13 +52,15 @@ def _prompt_google_api_key():
 
 
 class StreetViewAPI(LimitedClientSession):
-    def __init__(self, limit: int = 32000, per_secs: float = 60, *args, **kwargs):
+    def __init__(self, limit: int = MAX_API_REQ_PER_MIN, per_secs: float = 60, *args, **kwargs):
         super().__init__(limit, per_secs, *args, **kwargs)
 
     async def _api_get(self, url: str, params: dict) -> ClientResponse:
         if GOOGLE_API_KEY is None:
             _prompt_google_api_key()
         _p = {**params, 'size': '640x640', 'key': GOOGLE_API_KEY}
+        if GOOGLE_API_SIGNATURE:
+            _p['signature'] = GOOGLE_API_SIGNATURE
         async with self.get(url, params=_p) as res:
             return res
 
@@ -74,4 +77,5 @@ class StreetViewAPI(LimitedClientSession):
             return
         rp = RequestParams(metadata.pano_id, heading, fov, pitch)
         res = await self._api_get(GOOGLE_SV_API, {k: v for k, v in attrs.asdict(rp).items() if v is not None})
-        return View(await image_from_res(res), rp, metadata)
+        if res.ok:
+            return View(await image_from_res(res), rp, metadata)

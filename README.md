@@ -10,7 +10,8 @@ and various parts of the panorama in perspective distortion via the API.
 
 To run this package, you will need to create a `.env` file 
 and insert a `GOOGLE_API_KEY` obtained through the Google Cloud Platform 
-at https://developers.google.com/maps/documentation/streetview/get-api-key
+at https://developers.google.com/maps/documentation/streetview/get-api-key .
+A signature in `GOOGLE_API_SIGNATURE` is needed for over 25'000 requests per day.
 
 Please note that downloading panoramic images is free, 
 while downloading images in perspective distortion (views) 
@@ -70,10 +71,11 @@ download_panoramas(folder, loc1, loc2)
 
 Manual input:
 ```python
-from streetdownloader import download_panoramas, Location, Path
+from pathlib import Path
+from streetdownloader import download_panoramas, Location
 
 folder = Path('/path/to/colosseum')
-loc1 = 41.8914369,12.4907346
+loc1 = Location(41.8914369,12.4907346)
 loc2 = Location(41.8890246,12.4936502)
 download_panoramas(folder, loc1, loc2)
 ```
