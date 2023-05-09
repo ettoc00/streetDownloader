@@ -8,3 +8,10 @@ tqdm
 geopy
 selenium
 chromedriver-autoinstaller
+matplotlib
+scipy
+piexif
+pillow
+# scikit-learn
+# networkx
+# hdbscan
