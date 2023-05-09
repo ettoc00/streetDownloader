@@ -31,13 +31,22 @@ class MapsDriver:
     def __init__(self):
         from selenium.webdriver import Chrome
         from selenium.webdriver.common.by import By
+        from selenium.webdriver.chrome.options import Options
+        from selenium.common import ElementNotInteractableException
         import chromedriver_autoinstaller
         chromedriver_autoinstaller.install()
 
-        self.driver = Chrome()
+        options = Options()
+        self.driver = Chrome(options=options)
         self.driver.get('https://www.openstreetmap.org/')
-        if _t := self.driver.find_elements(By.CSS_SELECTOR, 'welcome button.btn-close'):
-            _t[0].click()
+        _t = self.driver.find_elements(By.CSS_SELECTOR, '.welcome button.btn-close')
+        if _t:
+            element = _t[0]
+            try:
+                if element.is_enabled() and element.is_displayed():
+                    element.click()
+            except ElementNotInteractableException:
+                pass
 
     def get_location(self):
         from urllib import parse
@@ -62,8 +71,10 @@ def user_input():
     with MapsDriver() as driver:
         input('Location 1:')
         l1 = driver.get_location()
+        print(l1)
         input('Location 2:')
         l2 = driver.get_location()
+        print(l2)
     return folder, l1, l2
 
 
@@ -72,7 +83,7 @@ class StreetDownloaderGUI:
         self.metadata_list: dict[Metadata] = {}
 
         self.root = tk.Tk()
-        self.root.title('MyApp')
+        self.root.title('Street Downloader GUI')
         self.root.geometry("640x360")
         self.cache_folder = Path(gettempdir()) / 'street-downloader'
         self.cache_folder.mkdir(exist_ok=True)
@@ -171,7 +182,7 @@ class StreetDownloaderGUI:
             self.angle_sliders = ScaleList(self.view_frame.content, 1, 30, [(f"{g}", n) for n, g in self.povs],
                                            command=self.update_view_image)
             self.angle_sliders.pack(pady=5)
-            self.crop_checkbox = LabelCheck(self.view_frame.content, text="Crop Image",
+            self.crop_checkbox = LabelCheck(self.view_frame.content, text="Crop Google Logo",
                                             value=streetdownloader.streetviewapi.CROP_GOOGLE_LOGO)
             self.crop_checkbox.pack(pady=5)
 
@@ -322,16 +333,19 @@ class StreetDownloaderGUI:
         loc1 = self.coord1_row.get()
         loc2 = self.coord2_row.get()
         api_key = self.api_key_entry.get()
-        if loc1 is None or loc2 is None or not api_key:
-            return
+        if loc1 is None or loc2 is None:
+            self.metadata_progress.label.config(text=f"Missing location")
+            self.metadata_progress.label.update()
+        if api_key is None:
+            self.metadata_progress.label.config(text=f"Missing Google API key")
+            self.metadata_progress.label.update()
         streetdownloader.streetviewapi.GOOGLE_API_KEY = api_key
         self.metadata_progress.clear_progress()
         self.metadata_button.config(command=self.stop_progress, text="Stop Metadata")
         buttons = self.metadata_export, self.view_button, self.panorama_button
-        for button in itertools.chain(buttons, self.header_buttons):
-            button.config(state=tk.DISABLED)
+        for t_button in itertools.chain(buttons, self.header_buttons):
+            t_button.config(state=tk.DISABLED)
         self.active_progress = True
-
         asyncio.run(self._get_metadata_with_progress())
         self.active_progress = False
         self.metadata_progress.bar['value'] = 100
@@ -373,7 +387,13 @@ class StreetDownloaderGUI:
                 self.images_progress.update_progress()
 
     def get_images_with_progress(self, panorama=False, view=False):
-        if not self.metadata_list or not self.folder_entry.get():
+        if not self.metadata_list:
+            self.images_progress.label.config(text=f"Missing metadata")
+            self.images_progress.label.update()
+            return
+        if not self.folder_entry.get():
+            self.images_progress.label.config(text=f"Missing download folder")
+            self.images_progress.label.update()
             return
         self.images_progress.clear_progress()
         if view:
