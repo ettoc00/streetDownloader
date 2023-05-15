@@ -7,7 +7,6 @@ from typing import Optional, Union
 import attrs
 import cattrs
 import numpy as np
-from aiohttp import ClientResponse
 from dotenv import load_dotenv
 
 from streetdownloader.common import BaseImage, Location, LimitedClientSession, image_from_res
@@ -54,6 +53,9 @@ class Metadata:
     date: str = None
     location: Location = None
     pano_id: str = None
+
+    def __bool__(self):
+        return self.ok
 
     @property
     def ok(self):
@@ -145,20 +147,27 @@ class StreetViewAPI:
             await _SessionManager.close()
             self._closed = True
 
-    async def _api_get(self, url: str, params: dict) -> ClientResponse:
+    def _api_get(self, url: str, params: dict):
         if GOOGLE_API_KEY is None:
             _prompt_google_api_key()
         params = {**params, 'size': '640x640', 'key': GOOGLE_API_KEY}
         if GOOGLE_API_SIGNATURE:
             params['signature'] = GOOGLE_API_SIGNATURE
-        async with self._session.get(url, params=params) as res:
-            return res
+        return self._session.get(url, params=params)
 
-    async def request_metadata(self, location: Union[Location, str]) -> Metadata:
-        params = {'location': location if isinstance(location, str) else f'{location[0]:.7f},{location[1]:.7f}'}
+    async def request_metadata(self, location: Union[Location, str, None] = None,
+                               pano: Union[str, None] = None) -> Metadata:
+        params = {}
+        if pano:
+            params['pano'] = pano
+        elif location:
+            if isinstance(location, tuple):
+                location = f'{location[0]},{location[1]}'
+            params['location'] = location
         while not self._session.closed:
-            res = await self._api_get(GOOGLE_SV_API + '/metadata', params)
-            meta: Metadata = cattrs.structure(await res.json(), Metadata)
+            request = await self._api_get(GOOGLE_SV_API + '/metadata', params)
+            async with request as res:
+                meta: Metadata = cattrs.structure(await res.json(), Metadata)
             if meta.status == MetadataStatus.OVER_QUERY_LIMIT:
                 await asyncio.sleep(1)
                 continue
@@ -169,7 +178,8 @@ class StreetViewAPI:
             view.metadata = await self.request_metadata(view.params.pano)
             view.params.pano = view.metadata.pano_id
         params = {k: v for k, v in attrs.asdict(view.params).items() if v is not None}
-        res = await self._api_get(GOOGLE_SV_API, params)
-        if res.ok:
-            view.api_image = await image_from_res(res)
-            return view
+        request = await self._api_get(GOOGLE_SV_API, params)
+        async with request as res:
+            if res.ok:
+                view.api_image = await image_from_res(res)
+                return view

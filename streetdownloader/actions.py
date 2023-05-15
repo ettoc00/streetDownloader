@@ -14,21 +14,24 @@ if TYPE_CHECKING:
 
 
 async def generate_metadata_from_coords(coords: Iterable[Location], from_google: bool = False,
-                                        empty_if_existing: bool = False):
+                                        also_errors: bool = False):
     panos = set()
-    chunk_size = 1 << 16
+    iterator, chunk_size = iter(coords), 1 << 16
     async with StreetViewAPI() as api:
         while True:
-            chunk = list(islice(coords, chunk_size))
+            chunk = tuple(islice(iterator, chunk_size))
             if not chunk:
                 return
             for coro in asyncio.as_completed(map(api.request_metadata, chunk)):
                 metadata: Metadata = await coro
-                if metadata.ok and (not from_google or metadata.from_google) and metadata.pano_id not in panos:
-                    panos.add(metadata.pano_id)
+                if metadata.ok:
+                    if (not from_google or metadata.from_google) and metadata.pano_id not in panos:
+                        panos.add(metadata.pano_id)
+                        yield metadata
+                    elif also_errors:
+                        yield
+                elif also_errors:
                     yield metadata
-                elif empty_if_existing:
-                    yield
 
 
 async def generate_metadata(loc1: Location, loc2: Location, from_google: bool = False, empty_if_existing: bool = False):

@@ -10,7 +10,7 @@ import cv2
 import numpy as np
 import piexif
 from PIL import Image
-from aiohttp import ClientSession, ClientResponse
+from aiohttp import ClientSession, ClientResponse, ClientConnectionError
 
 _T_co = TypeVar("_T_co", covariant=True)
 
@@ -129,8 +129,10 @@ class LimitedClientSession(ClientSession):
 
 
 async def image_from_res(res: ClientResponse):
-    # body = await res.read() doesn't work if connection is closed
-    body = (await res.text('latin-1')).encode('latin-1')
+    try:
+        body = await res.read()
+    except ClientConnectionError:  # connection closed
+        body = (await res.text('latin-1')).encode('latin-1')
     return image_from_bytes(body)
 
 

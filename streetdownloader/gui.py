@@ -735,11 +735,11 @@ class ImageFrame(ttk.LabelFrame):
         self.columnconfigure(1, weight=1)
 
         self.image_label = ttk.Label(self)
-        self.image_label.grid(row=0, column=0, sticky="ew")
+        self.image_label.grid(row=0, column=0, sticky=tk.N)
         self.grid_columnconfigure(1, weight=1, uniform="kkk")
 
         self.content = ttk.Frame(self)
-        self.content.grid(row=0, column=1, sticky="ew")
+        self.content.grid(row=0, column=1, sticky=tk.EW)
         self.grid_columnconfigure(1, weight=1, uniform="kkk")
 
         self.image_label.bind("<Configure>", self.resize_image)
@@ -748,26 +748,30 @@ class ImageFrame(ttk.LabelFrame):
     def update_image(self, image_path: Optional[Path]):
         try:
             self.image = Image.open(image_path)
-            self.resize_image()
+            self.resize_image(force_half=True)
         except (AttributeError, FileNotFoundError, ValueError):
             self.image_label.config(image="")
             self.image_label.image = None
             self.image_label.config(text=' ')
 
-    def resize_image(self, _=None):
+    def resize_image(self, *_, force_half=False):
         if not self.image:
             return
 
-        target_width = min(self.image_label.winfo_width(), self.master.winfo_width() >> 1)
-        target_height = self.image_label.winfo_height()
         img_ratio = float(self.image.width) / float(self.image.height)
+        if force_half:
+            target_width = self.master.winfo_width() >> 1
+            target_height = self.master.winfo_height()
+        else:
+            target_width = min(self.image_label.winfo_width(), self.winfo_width() >> 1)
+            target_height = self.image_label.winfo_height()
         target_ratio = float(target_width) / float(target_height)
 
         if target_ratio > img_ratio:
             target_width = int(target_height * img_ratio)
         else:
             target_height = int(target_width / img_ratio)
-        target_size = target_width, target_height
+        target_size = max(1, target_width), max(1, target_height)
         resized_image = self.image.resize(target_size)
         self.tk_image = ImageTk.PhotoImage(resized_image)
         self.image_label.config(image=self.tk_image)
